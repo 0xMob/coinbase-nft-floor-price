@@ -20,6 +20,10 @@ def main() -> None:
     logging.info("preprocessing")
     nft_trades_df = nft_trades_df[nft_trades_df["price_eth"] > 0]
     nft_trades_df["log_price"] = np.log(nft_trades_df["price_eth"])
+    # New Preprocessing Code
+    nft_trades_df.sort_values(["contract_address", "token_id", "block_number"], inplace=True)
+    nft_trades_df = nft_trades_df.groupby(["contract_address", "token_id"]).tail(1)
+    # End
     nft_trades_df.sort_values(
         ["chain_id", "contract_address", "block_number"], inplace=True
     )
