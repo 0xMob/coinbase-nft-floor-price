@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import numpy.typing as npt
 from scipy import stats
-
+import logging
 
 def create_lookback(data: pd.DataFrame, lookback: int) -> pd.DataFrame:
     """
@@ -36,9 +36,17 @@ def create_lookback(data: pd.DataFrame, lookback: int) -> pd.DataFrame:
         if idx == 0:
             lookback_prices.append([-42.0])
         else:
-            idx_start = max(0, idx - lookback)
-            prices = list(result.iloc[idx_start:idx]["log_price"])
-
+            # New Lookback Code
+            # This filters the data to the last 15 days of trades.
+            freshData = result[result["unix_timestamp"] >= (result.iloc[idx]["unix_timestamp"] - (15 * 24 * 60 * 60))]
+            freshData = freshData[freshData["unix_timestamp"] < result.iloc[idx]["unix_timestamp"]]
+            # If there are more than 140 sales within freshData, use all sales in freshData. Else, use the last 140 sales regardless of how long ago they took place.
+            if(freshData.shape[0] >= lookback) :
+                prices = list(freshData.iloc[0:idx]["log_price"])
+            else: # End of new lookback code
+                idx_start = max(0, idx - lookback)
+                prices = list(result.iloc[idx_start:idx]["log_price"])
+            
             lookback_prices.append(prices)
 
         trade_ids.append(idx)

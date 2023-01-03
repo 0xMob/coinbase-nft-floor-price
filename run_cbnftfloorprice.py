@@ -11,6 +11,7 @@ PCT_TARGET = 0.05
 PCT_TARGET_MIN = 0.02
 PCT_TARGET_MAX = 0.1
 SPEED = 0.5
+TWAP_Buffer_PCT = 0.95 # This creates a buffer before sales are removed on the basis of the bid-TWAP. For example, a value of 0.95 would mean that sales 5% below the bid-TWAP would be discarded.
 
 
 def main() -> None:
@@ -20,15 +21,25 @@ def main() -> None:
     logging.info("preprocessing")
     nft_trades_df = nft_trades_df[nft_trades_df["price_eth"] > 0]
     nft_trades_df["log_price"] = np.log(nft_trades_df["price_eth"])
+
+    # New Preprocessing Code:
+    # Drops transactions where price_eth is less than a certain percentage of twap-bid price at the time of the transaction
+    nft_trades_df = nft_trades_df[nft_trades_df["price_eth"] >= nft_trades_df["twap-bid"] * TWAP_Buffer_PCT] # Assuming that datapoints will have corresponding twap-bid information
+
+    # Keeps only the most recent transactions of a tokenId across all chains.
+    nft_trades_df.sort_values(["chain_id", "contract_address", "token_id", "block_number"], inplace=True)
+    nft_trades_df = nft_trades_df.groupby(["chain_id", "contract_address", "token_id"]).tail(1)
+    # End of new preprocessing code
+
     nft_trades_df.sort_values(
         ["chain_id", "contract_address", "block_number"], inplace=True
     )
     nft_trades_df["rank"] = nft_trades_df.groupby(["chain_id", "contract_address"])[
         "block_number"
     ].rank(method="first", ascending=False)
-    nft_trades_df = nft_trades_df[nft_trades_df["rank"] < BACKTEST + LOOKBACK * 2].drop(
+    nft_trades_df = nft_trades_df[nft_trades_df["rank"] < BACKTEST * 2 + LOOKBACK * 2].drop(
         "rank", axis=1
-    )
+    ) # We're increasing the datapoints pulled in here because it impacts the security of our implementation. This wouldn't be necessary if all the filtering of sales was done at the pre-processing stage instead of the main for loop; doing so would be more computationally efficient as well
 
     logging.info("creating lookback")
     nft_trades_df = (
